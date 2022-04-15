@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Bits;
 
@@ -11,16 +13,22 @@ public readonly struct BitArray<T> :
     IEnumerable<Bit>
     where T : unmanaged
 {
+    private const int BITS_PER_BYTE = 8;
     private readonly int _size;
-    private readonly T _value;
     private readonly Bit[] _bits;
     private readonly IList<Bit> _list;
 
     public unsafe BitArray(T value)
     {
-        _size = sizeof(T) * 8;
-        _value = value;
-        _bits = GetBits(_value);
+        _size = sizeof(T) * BITS_PER_BYTE;
+        _bits = GetBits(value);
+        _list = new List<Bit>(_bits);
+    }
+
+    public unsafe BitArray(Bit[] bits)
+    {
+        _size = sizeof(T) * BITS_PER_BYTE;
+        _bits = bits;
         _list = new List<Bit>(_bits);
     }
 
@@ -28,7 +36,7 @@ public readonly struct BitArray<T> :
 
     private static unsafe Bit[] GetBits(byte value)
     {
-        var count = sizeof(byte) * 8;
+        var count = sizeof(byte) * BITS_PER_BYTE;
         var bytes = new int[count];
         for (var i = 0; value > 0; i++)
         {
@@ -64,16 +72,110 @@ public readonly struct BitArray<T> :
 
         return bits.ToArray();
     }
+    
+    public static BitArray<T> operator &(BitArray<T> left, BitArray<T> right)
+    {
+        var bits = new Bit[left._bits.Length];
+        for (var i = 0; i < bits.Length; i++)
+        {
+            bits[i] = left._bits[i] & right._bits[i];
+        }
 
-    public byte[] GetBytes()
+        return new BitArray<T>(bits);
+    }
+
+    public static BitArray<T> operator |(BitArray<T> left, BitArray<T> right)
+    {
+        var bits = new Bit[left._bits.Length];
+        for (var i = 0; i < bits.Length; i++)
+        {
+            bits[i] = left._bits[i] | right._bits[i];
+        }
+
+        return new BitArray<T>(bits);
+    }
+
+    public static BitArray<T> operator ^(BitArray<T> left, BitArray<T> right)
+    {
+        var size = Math.Max(left._size, right._size);
+        var bits = new Bit[size];
+        for (var i = 0; i < size; i++)
+        {
+            bits[i] = left[i] ^ right[i];
+        }
+
+        return new BitArray<T>(bits);
+    }
+
+    public static BitArray<T> operator ~(BitArray<T> bits)
+    {
+        var size = bits._size;
+        var result = new Bit[size];
+        for (var i = 0; i < size; i++)
+        {
+            result[i] = ~bits[i];
+        }
+
+        return new BitArray<T>(result);
+    }
+
+    public static BitArray<T> operator !(BitArray<T> bits)
+    {
+        var size = bits._size;
+        var result = new Bit[size];
+        for (var i = 0; i < size; i++)
+        {
+            result[i] = !bits[i];
+        }
+
+        return new BitArray<T>(result);
+    }
+
+    public static BitArray<T> operator <<(BitArray<T> bits, int shift)
+    {
+        var size = bits._size;
+        var result = new Bit[size];
+        for (var i = 0; i < size; i++)
+        {
+            result[i] = bits[(i + shift) % size];
+        }
+
+        return new BitArray<T>(result);
+    }
+
+    public static BitArray<T> operator >>(BitArray<T> bits, int shift)
+    {
+        var size = bits._size;
+        var result = new Bit[size];
+        for (var i = 0; i < size; i++)
+        {
+            result[i] = bits[(i + size - shift) % size];
+        }
+
+        return new BitArray<T>(result);
+    }
+
+    public static bool operator ==(BitArray<T> left, BitArray<T> right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(BitArray<T> left, BitArray<T> right)
+    {
+        return !(left == right);
+    }
+
+    public static implicit operator BitArray<T>(T value) => new(value);
+
+    public Bit[][] GetSegments()
     {
         var bits = _bits;
-        var count = bits.Length / 8;
+        var count = bits.Length / BITS_PER_BYTE;
         Bit[][] bitmap = new Bit[count][];
         var position = 0;
         for (int i = 0; i < count; i++)
         {
-            var array = new Bit[8];
+            var array = new Bit[BITS_PER_BYTE];
             var index = position;
             for (int j = 0; j < array.Length; j++)
             {
@@ -85,6 +187,12 @@ public readonly struct BitArray<T> :
             bitmap[i] = array;
         }
 
+        return bitmap;
+    }
+
+    public byte[] GetBytes()
+    {
+        var bitmap = GetSegments();
         var bytes = new byte[bitmap.Length];
         for (int i = 0; i < bitmap.Length; i++)
         {
@@ -149,19 +257,27 @@ public readonly struct BitArray<T> :
         return obj is BitArray<T> array && Equals(array);
     }
 
-    public static bool operator ==(BitArray<T> left, BitArray<T> right)
-    {
-        return left.Equals(right);
-    }
-
-    public static bool operator !=(BitArray<T> left, BitArray<T> right)
-    {
-        return !(left == right);
-    }
-
     public override string ToString()
     {
         var str = string.Join("", this);
         return str;
+    }
+
+    public string ToString(bool segmented)
+    {
+        if (segmented)
+        {
+            var sb = new StringBuilder();
+            var segments = GetSegments();
+            for (var i = 0; i < segments.Length; i++)
+            {
+                BitArray<T> segment = new BitArray<T>(segments[i]);
+                sb.Append(segment.ToString() + " ");
+            }
+
+            return sb.ToString();
+        }
+
+        return ToString();
     }
 }
