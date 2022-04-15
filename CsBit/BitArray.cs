@@ -32,7 +32,25 @@ public readonly struct BitArray<T> :
         _list = new List<Bit>(_bits);
     }
 
-    public Bit this[int index] => _bits[index];
+    public unsafe BitArray(BitArray<T> other)
+    {
+        _size = sizeof(T) * BITS_PER_BYTE;
+        _bits = other._bits;
+        _list = new List<Bit>(_bits);
+    }
+
+    public Bit this[int index]
+    {
+        get
+        {
+            return _bits[index];
+        }
+
+        set
+        {
+            _bits[index] = value;
+        }
+    }
 
     private static unsafe Bit[] GetBits(byte value)
     {
@@ -166,6 +184,8 @@ public readonly struct BitArray<T> :
     }
 
     public static implicit operator BitArray<T>(T value) => new(value);
+
+    public static implicit operator BitArray<T>(Bit[] bits) => new(bits);
 
     public Bit[][] GetSegments()
     {

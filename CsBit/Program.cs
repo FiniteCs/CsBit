@@ -9,6 +9,9 @@ public static class Program
     public static void Main()
     {
         var bitList = new BitArray<int>(10342);
+        var bitListCopy = new BitArray<int>(bitList);
+        Console.WriteLine(bitList == bitListCopy);
+
         Console.WriteLine(bitList.ToString(true));
         Console.WriteLine(bitList.ReadBits());;
 
