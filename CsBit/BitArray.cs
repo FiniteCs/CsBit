@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -37,19 +36,6 @@ public readonly struct BitArray<T> :
         _size = sizeof(T) * BITS_PER_BYTE;
         _bits = other._bits;
         _list = new List<Bit>(_bits);
-    }
-
-    public Bit this[int index]
-    {
-        get
-        {
-            return _bits[index];
-        }
-
-        set
-        {
-            _bits[index] = value;
-        }
     }
 
     private static unsafe Bit[] GetBits(byte value)
@@ -91,6 +77,19 @@ public readonly struct BitArray<T> :
         return bits.ToArray();
     }
     
+    public Bit this[int index]
+    {
+        get
+        {
+            return _bits[index];
+        }
+
+        set
+        {
+            _bits[index] = value;
+        }
+    }
+
     public static BitArray<T> operator &(BitArray<T> left, BitArray<T> right)
     {
         var bits = new Bit[left._bits.Length];
@@ -137,18 +136,6 @@ public readonly struct BitArray<T> :
         return new BitArray<T>(result);
     }
 
-    public static BitArray<T> operator !(BitArray<T> bits)
-    {
-        var size = bits._size;
-        var result = new Bit[size];
-        for (var i = 0; i < size; i++)
-        {
-            result[i] = !bits[i];
-        }
-
-        return new BitArray<T>(result);
-    }
-
     public static BitArray<T> operator <<(BitArray<T> bits, int shift)
     {
         var size = bits._size;
@@ -160,7 +147,7 @@ public readonly struct BitArray<T> :
 
         return new BitArray<T>(result);
     }
-
+    
     public static BitArray<T> operator >>(BitArray<T> bits, int shift)
     {
         var size = bits._size;
@@ -172,12 +159,12 @@ public readonly struct BitArray<T> :
 
         return new BitArray<T>(result);
     }
-
+    
     public static bool operator ==(BitArray<T> left, BitArray<T> right)
     {
         return left.Equals(right);
     }
-
+    
     public static bool operator !=(BitArray<T> left, BitArray<T> right)
     {
         return !(left == right);
@@ -187,6 +174,21 @@ public readonly struct BitArray<T> :
 
     public static implicit operator BitArray<T>(Bit[] bits) => new(bits);
 
+    public int Length => _size;
+
+    public Type BitFormatType => typeof(T);
+    
+    public BitArray<T> Reverse()
+    {
+        var bitArray = new Bit[Length];
+        for (int i = 0; i < Length; i++)
+        {
+            bitArray[i] = this[Length - i - 1];
+        }
+
+        return new BitArray<T>(bitArray);
+    }
+    
     public Bit[][] GetSegments()
     {
         var bits = _bits;
@@ -279,25 +281,15 @@ public readonly struct BitArray<T> :
 
     public override string ToString()
     {
-        var str = string.Join("", this);
-        return str;
-    }
-
-    public string ToString(bool segmented)
-    {
-        if (segmented)
+        var sb = new StringBuilder();
+        var segments = GetSegments();
+        for (var i = 0; i < segments.Length; i++)
         {
-            var sb = new StringBuilder();
-            var segments = GetSegments();
-            for (var i = 0; i < segments.Length; i++)
-            {
-                BitArray<T> segment = new BitArray<T>(segments[i]);
-                sb.Append(segment.ToString() + " ");
-            }
-
-            return sb.ToString();
+            BitArray<T> segment = new BitArray<T>(segments[i]);
+            var str = string.Join("", segment);
+            sb.Append(str + " ");
         }
 
-        return ToString();
+        return sb.ToString();
     }
 }
