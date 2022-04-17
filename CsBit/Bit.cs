@@ -8,6 +8,12 @@ public readonly struct Bit
     private readonly bool _value;
     private readonly int _iValue;
 
+    public Bit()
+    {
+        _value = false;
+        _iValue = 0;
+    }
+
     private Bit(bool value)
     {
         _value = value;
