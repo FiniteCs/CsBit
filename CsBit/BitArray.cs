@@ -39,45 +39,6 @@ public readonly struct BitArray<T>:
         _bits = other._bits;
         _list = new List<Bit>(_bits);
     }
-
-    private static unsafe Bit[] GetBits(byte value)
-    {
-        var count = sizeof(byte) * BITS_PER_BYTE;
-        var bytes = new int[count];
-        for (var i = 0; value > 0; i++)
-        {
-            bytes[i] = value % 2;
-            value /= 2;
-        }
-
-        Array.Reverse(bytes);
-        var bits = new Bit[bytes.Length];
-        for (var i = 0; i < bytes.Length; i++)
-        {
-            bits[i] = bytes[i];
-        }
-
-        return bits;
-    }
-
-    private static unsafe Bit[] GetBits(T value)
-    {
-        var size = sizeof(T);
-        var bytes = new byte[size];
-
-        nint ptr = Marshal.AllocHGlobal(size);
-        Marshal.StructureToPtr(value, ptr, false);
-        Marshal.Copy(ptr, bytes, 0, size);
-        Marshal.FreeHGlobal(ptr);
-        var bits = new List<Bit>();
-        for (var i = 0; i < size; i++)
-        {
-            var byteBits = GetBits(bytes[i]);
-            bits.AddRange(byteBits);
-        }
-
-        return bits.ToArray();
-    }
     
     public static BitArray<T> operator &(BitArray<T> left, BitArray<T> right)
     {
@@ -125,6 +86,50 @@ public readonly struct BitArray<T>:
         return new BitArray<T>(result);
     }
 
+    public static BitArray<T> operator <<(BitArray<T> bits, int shift)
+    {
+        if (shift < 0)
+        {
+            shift = bits._size + shift;
+        }
+        else if (shift > bits._size - 1)
+        {
+            shift -= bits._size;
+        }
+
+        var shiftBits = new Bit[shift];
+        var bitArray = bits._bits;
+
+        var temp = new Bit[bitArray.Length - shift];
+        Array.Copy(bitArray, shift, temp, 0, temp.Length);
+        var shifted = new Bit[temp.Length + shiftBits.Length];
+        Array.Copy(temp, 0, shifted, 0, temp.Length);
+        Array.Copy(shiftBits, 0, shifted, temp.Length, shiftBits.Length);
+        return new BitArray<T>(shifted);
+    }
+
+    public static BitArray<T> operator >>(BitArray<T> bits, int shift)
+    {
+        if (shift < 0)
+        {
+            shift = bits._size + shift;
+        }
+        else if (shift > bits._size - 1)
+        {
+            shift -= bits._size;
+        }
+
+        var shiftBits = new Bit[shift];
+        var bitArray = bits._bits;
+
+        var temp = new Bit[bitArray.Length - shift];
+        Array.Copy(bitArray, 0, temp, 0, temp.Length);
+        var shifted = new Bit[temp.Length + shiftBits.Length];
+        Array.Copy(temp, 0, shifted, shift, temp.Length);
+        Array.Copy(shiftBits, 0, shifted, 0, shift);
+        return new BitArray<T>(shifted);
+    }
+
     public static bool operator ==(BitArray<T> left, BitArray<T> right)
     {
         return left.Equals(right);
@@ -165,35 +170,47 @@ public readonly struct BitArray<T>:
     #endregion
 
     #region Methods
-    private static TType[] ShiftArray<TType>(TType[] source, TType[] items, int shift)
+    private static unsafe Bit[] GetBits(byte value)
     {
-        var poppedItems = new TType[shift];
-        for (int j = 0; j < shift; j++)
+        var count = sizeof(byte) * BITS_PER_BYTE;
+        var hBits = new int[count];
+        for (var i = 0; value > 0; i++)
         {
-            poppedItems[j] = source[j];
+            hBits[i] = value % 2;
+            value /= 2;
         }
 
-        var temp = new TType[source.Length - shift];
-        Array.Copy(source, shift, temp, 0, temp.Length);
-
-        var shiftedArray = new TType[temp.Length + items.Length];
-        Array.Copy(temp, 0, shiftedArray, 0, temp.Length);
-        Array.Copy(items, 0, shiftedArray, temp.Length, items.Length);
-        return shiftedArray;
+        var bits = new Bit[hBits.Length];
+        for (var i = 0; i < hBits.Length; i++)
+        {
+            bits[i] = hBits[i];
+        }
+        
+        return bits;
     }
 
-    public BitArray<T> Reverse()
+    private static unsafe Bit[] GetBits(T value)
     {
-        var bitArray = new Bit[Count];
-        for (int i = 0; i < Count; i++)
+        var size = sizeof(T);
+        var bytes = new byte[size];
+
+        nint ptr = Marshal.AllocHGlobal(size);
+        Marshal.StructureToPtr(value, ptr, false);
+        Marshal.Copy(ptr, bytes, 0, size);
+        Marshal.FreeHGlobal(ptr);
+        var bits = new List<Bit>();
+        for (var i = 0; i < size; i++)
         {
-            bitArray[i] = this[Count - i - 1];
+            var byteBits = GetBits(bytes[i]);
+            bits.AddRange(byteBits);
         }
 
-        return new BitArray<T>(bitArray);
+        bits.Reverse();
+
+        return bits.ToArray();
     }
-    
-    public Bitmap GetSegments()
+
+    public Bit[][] GetSegments()
     {
         var bits = _bits;
         var count = bits.Length / BITS_PER_BYTE;
@@ -213,7 +230,7 @@ public readonly struct BitArray<T>:
             bitmap[i] = array;
         }
 
-        return new Bitmap(bitmap);
+        return bitmap;
     }
 
     public byte[] GetBytes()
@@ -242,6 +259,7 @@ public readonly struct BitArray<T>:
     public T ReadBits()
     {
         var bytes = GetBytes();
+        Array.Reverse(bytes);
         return Unsafe.ReadUnaligned<T>(ref bytes[0]);
     }
 
@@ -302,115 +320,4 @@ public readonly struct BitArray<T>:
         return sb.ToString();
     }
     #endregion
-}
-
-public readonly struct Bitmap
-{
-    private readonly Bit[][] _bitmap;
-    private readonly int _allBits;
-    private readonly int _size;
-        
-    public Bitmap(Bit[][] bitmap)
-    {
-        _bitmap = bitmap;
-        var allBits = 0;
-        for (var i = 0; i < bitmap.Length; i++)
-        {
-            allBits += bitmap[i].Length;
-        }
-
-        _allBits = allBits;
-        _size = bitmap.Length;
-    }
-        
-    public Bit[] this[int index]
-    {
-        get => _bitmap[index];
-        set => _bitmap[index] = value;
-    }
-
-    public int Length => _size;
-
-    public int AllBitsCount => _allBits;
-
-    public Bit[][] ToArray() => _bitmap;
-
-    public BitArray<T> ToBitArray<T>()
-        where T : unmanaged
-    {
-        var bitArray = new Bit[_allBits];
-        var pos = 0;
-        for (int i = 0; i < _size; i++)
-        {
-            var arr = this[i];
-            for (int j = 0; j < arr.Length; j++)
-            {
-                bitArray[pos] = arr[j];
-                pos++;
-            }
-        }
-
-        return new BitArray<T>(bitArray);
-    }
-}
-
-public readonly struct BitStack:
-    IEnumerable<Bit>,
-    ICollection
-{
-    private readonly Stack<Bit> _stack;
-    public BitStack()
-    {
-        _stack = new Stack<Bit>();
-    }
-
-    public int Count => _stack.Count;
-
-    public bool IsSynchronized => false;
-
-    public object SyncRoot => null;
-
-    public void Push(Bit bit)
-    {
-        _stack.Push(bit);
-    }
-
-    public Bit Pop()
-    {
-        return _stack.Pop();
-    }
-
-    public void PushRange(Bit[] bits)
-    {
-        for (int i = bits.Length - 1; i >= 0; i--)
-        {
-            _stack.Push(bits[i]);
-        }
-    }
-
-    public Bit[] PopRange(int count)
-    {
-        var bits = new Bit[count];
-        for (int i = 0; i < count; i++)
-        {
-            bits[i] = _stack.Pop();
-        }
-
-        return bits;
-    }
-
-    public void CopyTo(Array array, int index)
-    {
-        Array.Copy(_stack.ToArray(), 0, array, index, _stack.Count);
-    }
-
-    public IEnumerator<Bit> GetEnumerator()
-    {
-        return _stack.GetEnumerator();
-    }
-
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
-    }
 }

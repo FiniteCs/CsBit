@@ -9,17 +9,8 @@ public static class Program
     {
         var left = new BitArray<int>(42);
         var right = new BitArray<int>(24);
-        var test = new BitArray<int>(new Bit[]
-        {
-            1, 1, 1, 1, 1, 1, 1, 1,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            1, 1, 1, 1, 1, 1, 1, 1,
-            0, 0, 0, 0, 0, 0, 0, 0,
-        });
 
-        Console.WriteLine(new BitArray<int>(test.ReadBits() << 7));
-
-#if OPERATIONS_
+#if OPERATIONS
         #region BitArray operations
         WriteLine(left);
         WriteLine(right);
@@ -45,10 +36,8 @@ public static class Program
         WriteLine(42 == 24);
         WriteLine(left != right);
         WriteLine(42 != 24);
-        WriteLine(left.Length);
-        WriteLine(right.Length);
-        WriteLine(left.Reverse());
-        WriteLine(right.Reverse());
+        WriteLine(left.Count);
+        WriteLine(right.Count);
         WriteLine(left.BitFormatType.Name);
         WriteLine(right.BitFormatType.Name);
         #endregion
