@@ -166,7 +166,7 @@ public readonly struct BitArray<T>:
 
     public object SyncRoot => null;
 
-    public bool IsReadOnly => throw new NotImplementedException();
+    public bool IsReadOnly => true;
     #endregion
 
     #region Methods
@@ -208,6 +208,12 @@ public readonly struct BitArray<T>:
         bits.Reverse();
 
         return bits.ToArray();
+    }
+
+    public static unsafe BitArray<T> Empty()
+    {
+        var array = new Bit[sizeof(T) * BITS_PER_BYTE];
+        return new BitArray<T>(array);
     }
 
     public Bit[][] GetSegments()
